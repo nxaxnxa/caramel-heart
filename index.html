@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-      <meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Savings</title>
+    <title>Caramel Heart Tracker</title>
     
     <!-- 加入主畫面圖示設定 -->
     <link rel="apple-touch-icon" href="icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Savings">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=Noto+Sans+TC:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --cream: #FFFDF9;
@@ -147,7 +150,7 @@
     </header>
 
     <main class="px-6 space-y-6">
-        <!-- Tab 1: 50. -->
+        <!-- 分頁 1: 50元 -->
         <section id="pane-1" class="tab-pane">
             <div class="kawaii-card p-6 mb-6 flex items-center justify-between">
                 <div class="flex-1">
@@ -168,7 +171,7 @@
             <div id="m1-grid" class="savings-grid"></div>
         </section>
 
-        <!-- Tab 2: 365. -->
+        <!-- 分頁 2: 365天 -->
         <section id="pane-2" class="tab-pane hidden">
             <div class="kawaii-card p-6 mb-6 flex items-center justify-between">
                 <div>
@@ -190,7 +193,7 @@
             <div id="m2-grid" class="savings-grid"></div>
         </section>
 
-        <!-- Tab 3: Idol. -->
+        <!-- 分頁 3: 偶像 -->
         <section id="pane-3" class="tab-pane hidden">
             <div class="kawaii-card p-8 mb-6">
                 <div class="flex justify-between items-center mb-6">
@@ -245,7 +248,7 @@
             </div>
         </section>
 
-        <!-- Tab 4: Set. -->
+        <!-- 分頁 4: 設定 -->
         <section id="pane-4" class="tab-pane hidden">
             <div class="space-y-6">
                 <div class="kawaii-card p-8">
@@ -259,10 +262,6 @@
                             開啟提醒功能
                         </button>
                     </div>
-                    <p class="text-[10px] text-stone-400 mt-4 leading-relaxed">
-                        * 提醒功能需在 HTTPS 環境下運作。<br>
-                        * 建議將此網頁「加入主畫面」後開啟。
-                    </p>
                 </div>
 
                 <div class="kawaii-card p-8">

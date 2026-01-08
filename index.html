@@ -270,7 +270,6 @@
             box-shadow: 0 0 15px var(--caramel);
         }
 
-        /* 改版後的每月總結卡片樣式 */
         .summary-card-v2 {
             background: var(--cream);
             border-radius: 28px;
@@ -316,7 +315,6 @@
 </head>
 <body class="pb-10">
 
-    <!-- 總額頭部 -->
     <header class="p-8 pt-12 flex flex-col items-center">
         <div class="relative flex items-center gap-2">
             <span class="text-[11px] font-bold tracking-[0.2em] opacity-60 uppercase">TOTAL SAVINGS</span>
@@ -337,7 +335,6 @@
         </nav>
     </header>
 
-    <!-- 第一分頁：存錢計畫 -->
     <main id="page-savings" class="px-6 space-y-6">
         <div class="flex justify-center gap-2 mb-2">
             <button onclick="switchTab(1)" id="sub-nav-1" class="sub-nav-btn active">50元零錢</button>
@@ -439,9 +436,7 @@
         </section>
     </main>
 
-    <!-- 第二分頁：日常記帳 (改版版) -->
     <main id="page-ledger" class="px-6 space-y-6 hidden">
-        <!-- 數據統計卡片 v2 -->
         <div class="summary-card-v2 shadow-lg">
             <div class="flex justify-between items-start mb-6">
                 <div>
@@ -476,7 +471,6 @@
             </div>
         </div>
 
-        <!-- 輸入區域 -->
         <div class="ledger-input-group shadow-sm">
             <div class="flex gap-3 mb-5 p-1 bg-black/5 rounded-2xl">
                 <button id="type-exp" onclick="setLedgerType('expense')" class="type-btn expense active">支出</button>
@@ -506,19 +500,15 @@
             </div>
         </div>
 
-        <!-- 歷史清單 -->
         <div class="space-y-4">
             <div class="flex items-center justify-between px-2">
                 <h3 class="text-[11px] font-bold opacity-40 tracking-[0.2em] uppercase">Recent Transactions</h3>
                 <span id="ledger-count" class="text-[10px] opacity-40 font-bold italic"></span>
             </div>
-            <div id="ledger-list" class="space-y-3 pb-10">
-                <!-- 由 JS 渲染 -->
-            </div>
+            <div id="ledger-list" class="space-y-3 pb-10"></div>
         </div>
     </main>
 
-    <!-- 第三分頁：系統設定 -->
     <main id="page-settings" class="px-6 space-y-6 hidden">
         <div class="kawaii-card p-8">
             <h3 class="text-xs font-bold text-caramel uppercase tracking-widest mb-6">主題配色</h3>
@@ -568,7 +558,6 @@
         </div>
     </main>
 
-    <!-- Modal -->
     <div id="modal" class="modal fixed inset-0 flex items-center justify-center p-10">
         <div class="absolute inset-0 bg-black/40" onclick="closeModal()"></div>
         <div class="kawaii-card w-full max-w-xs p-8 relative z-10 text-center mx-auto transform transition-all scale-100">
@@ -585,6 +574,10 @@
     </div>
 
     <script>
+        // 固定 KEY 名稱，以後更新代碼請不要修改這行
+        const APP_STORAGE_KEY = 'WalletKun_Official_Data';
+        const OLD_KEY = 'caramel_heart_v36_ledger_v2';
+
         let state = { 
             m1: [], m2: [], m3Total: 0, idolName: "", goal: 0, locked: false, 
             activeTab: 1, reminderTime: "21:00", notificationsEnabled: false,
@@ -593,12 +586,32 @@
             ledgerType: 'expense',
             theme: '' 
         };
-        const KEY = 'caramel_heart_v36_ledger_v2';
 
         function init() {
-            const data = localStorage.getItem(KEY);
-            if (data) state = JSON.parse(data);
+            // 嘗試讀取新 KEY
+            let data = localStorage.getItem(APP_STORAGE_KEY);
             
+            // 資料遷移邏輯：如果新 KEY 沒資料，但舊 KEY 有資料，則搬移資料
+            if (!data) {
+                const oldData = localStorage.getItem(OLD_KEY);
+                if (oldData) {
+                    console.log("發現舊版本資料，正在搬移...");
+                    localStorage.setItem(APP_STORAGE_KEY, oldData);
+                    data = oldData;
+                }
+            }
+
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    // 確保讀取進來的是對象，並合併預設值
+                    state = Object.assign({}, state, parsed);
+                } catch(e) {
+                    console.error("資料解析失敗", e);
+                }
+            }
+            
+            // 同步 UI 狀態
             document.getElementById('idol-name').value = state.idolName || "";
             document.getElementById('idol-name').oninput = (e) => { state.idolName = e.target.value; save(); };
             document.getElementById('reminder-time').value = state.reminderTime || "21:00";
@@ -617,7 +630,9 @@
             setInterval(checkReminder, 60000);
         }
 
-        function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+        function save() { 
+            localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(state)); 
+        }
 
         function setTheme(themeName) {
             document.body.classList.remove('theme-pink', 'theme-dark', 'theme-green');
@@ -672,7 +687,8 @@
         }
 
         function addLedger() {
-            const amt = parseInt(document.getElementById('ledger-amt').value);
+            const amtInput = document.getElementById('ledger-amt');
+            const amt = parseInt(amtInput.value);
             const cat = document.getElementById('ledger-cat').value;
             const note = document.getElementById('ledger-note').value;
             if(!amt || amt <= 0) return;
@@ -693,11 +709,9 @@
             renderSummary();
             updateUI();
             
-            // 觸發一個簡單的小動畫效果
-            document.getElementById('ledger-amt').value = ''; 
+            amtInput.value = ''; 
             document.getElementById('ledger-note').value = '';
             
-            // 如果是支出，給一個簡單的視覺反饋
             if(entry.type === 'expense') {
                 document.getElementById('exp-progress').parentElement.classList.add('animate-pulse');
                 setTimeout(() => document.getElementById('exp-progress').parentElement.classList.remove('animate-pulse'), 1000);
@@ -735,7 +749,6 @@
             netEl.innerText = `${net >= 0 ? '' : '-'}$${Math.abs(net).toLocaleString()}`;
             netEl.className = `text-xl font-bold ${net >= 0 ? 'text-cocoa' : 'text-red-500'}`;
             
-            // 進度條邏輯：支出佔總額（收+支）的比例，或是支出佔收入的比例
             const total = (income + expense) || 1;
             const expPerc = (expense / total) * 100;
             const incPerc = (income / total) * 100;
@@ -801,86 +814,188 @@
         }
 
         function updateUI() {
-            const s1 = state.m1.length * 50; const s1Perc = (state.m1.length / 365) * 100;
-            updateHeartFill('m1', s1Perc); document.getElementById('m1-percentage').innerText = Math.round(s1Perc) + '%';
-            document.getElementById('m1-days-count').innerText = `已完成 ${state.m1.length}/365天`;
+            const s1 = (state.m1 || []).length * 50; 
+            const s1Perc = ( (state.m1 || []).length / 365) * 100;
+            updateHeartFill('m1', s1Perc); 
+            document.getElementById('m1-percentage').innerText = Math.round(s1Perc) + '%';
+            document.getElementById('m1-days-count').innerText = `已完成 ${ (state.m1 || []).length}/365天`;
             
-            const s2 = state.m2.reduce((a,b)=>a+b, 0); const s2Total = (1 + 365) * 365 / 2;
-            updateHeartFill('m2', (s2 / s2Total) * 100); document.getElementById('m2-total').innerText = s2.toLocaleString();
+            const s2 = (state.m2 || []).reduce((a,b)=>a+b, 0); 
+            const s2Total = (1 + 365) * 365 / 2;
+            updateHeartFill('m2', (s2 / s2Total) * 100); 
+            document.getElementById('m2-total').innerText = s2.toLocaleString();
             
-            const s3 = state.m3Total || 0; document.getElementById('m3-total-display').innerText = s3.toLocaleString();
+            const s3 = state.m3Total || 0; 
+            document.getElementById('m3-total-display').innerText = s3.toLocaleString();
             if (state.locked && state.goal > 0) {
                 updateHeartFill('m3', Math.min(100, (s3 / state.goal) * 100));
-                document.getElementById('goal-ui-setup').classList.add('hidden'); document.getElementById('goal-ui-locked').classList.remove('hidden');
-                const diff = state.goal - s3; document.getElementById('goal-diff-text').innerText = diff <= 0 ? `已達成目標！` : `還差 $${diff.toLocaleString()} 達成目標`;
+                document.getElementById('goal-ui-setup').classList.add('hidden'); 
+                document.getElementById('goal-ui-locked').classList.remove('hidden');
+                const diff = state.goal - s3; 
+                document.getElementById('goal-diff-text').innerText = diff <= 0 ? `已達成目標！` : `還差 $${diff.toLocaleString()} 達成目標`;
             } else { 
                 updateHeartFill('m3', 0); 
                 document.getElementById('goal-ui-setup').classList.remove('hidden'); 
                 document.getElementById('goal-ui-locked').classList.add('hidden'); 
             }
             
-            const ledgerBalance = state.ledger.reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, 0);
+            const ledgerBalance = (state.ledger || []).reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, 0);
             document.getElementById('header-total').innerText = (s1 + s2 + s3 + ledgerBalance).toLocaleString();
         }
 
-        function updateHeartFill(id, percentage) { const rect = document.getElementById(`${id}-fill-rect`); if (rect) { const height = (percentage / 100) * 24; rect.setAttribute('y', 24 - height); rect.setAttribute('height', height); } }
+        function updateHeartFill(id, percentage) { 
+            const rect = document.getElementById(`${id}-fill-rect`); 
+            if (rect) { 
+                const height = (percentage / 100) * 24; 
+                rect.setAttribute('y', 24 - height); 
+                rect.setAttribute('height', height); 
+            } 
+        }
         
         function askConfirm(type, amount, id) {
-            const modal = document.getElementById('modal'); const desc = document.getElementById('modal-desc'); const title = document.getElementById('modal-title');
-            const confirmBtn = document.getElementById('modal-btn'); const cancelBtn = document.getElementById('modal-cancel-btn'); const icon = document.getElementById('modal-icon');
-            icon.classList.remove('text-red-500'); icon.classList.add('text-caramel'); cancelBtn.classList.remove('hidden'); cancelBtn.innerText = "取消"; confirmBtn.innerText = "確認餵食"; title.innerText = "確認餵食";
-            if (type === 'M1' || type === 'M2') { desc.innerHTML = `要餵食 $${amount} 元給財布君嗎？<br>確認後財布君就會把它吃進去哦！<br>(๑⃙⃘´༥\`๑⃙⃘)`; }
-            else if (type === 'Idol') { title.innerText = "注入應援基金"; desc.innerHTML = `財布君將幫您保管 <span class="text-caramel font-bold">$${amount}</span> 應援基金 <br> ٩(ˊᗜˋ*)و`; cancelBtn.classList.add('hidden'); confirmBtn.innerText = "請幫我保管！"; }
+            const modal = document.getElementById('modal'); 
+            const desc = document.getElementById('modal-desc'); 
+            const title = document.getElementById('modal-title');
+            const confirmBtn = document.getElementById('modal-btn'); 
+            const cancelBtn = document.getElementById('modal-cancel-btn'); 
+            const icon = document.getElementById('modal-icon');
+            
+            icon.classList.remove('text-red-500'); 
+            icon.classList.add('text-caramel'); 
+            cancelBtn.classList.remove('hidden'); 
+            cancelBtn.innerText = "取消"; 
+            confirmBtn.innerText = "確認餵食"; 
+            title.innerText = "確認餵食";
+
+            if (type === 'M1' || type === 'M2') { 
+                desc.innerHTML = `要餵食 $${amount} 元給財布君嗎？<br>確認後財布君就會把它吃進去哦！<br>(๑⃙⃘´༥\`๑⃙⃘)`; 
+            } else if (type === 'Idol') { 
+                title.innerText = "注入應援基金"; 
+                desc.innerHTML = `財布君將幫您保管 <span class="text-caramel font-bold">$${amount}</span> 應援基金 <br> ٩(ˊᗜˋ*)و`; 
+                cancelBtn.classList.add('hidden'); 
+                confirmBtn.innerText = "請幫我保管！"; 
+            }
+            
             modal.classList.add('active');
-            confirmBtn.onclick = () => { if(type==='M1') { if(!state.m1.includes(id)) state.m1.push(id); } else if(type==='M2') { if(!state.m2.includes(id)) state.m2.push(id); } else if(type==='Idol') { state.m3Total += amount; } save(); renderGrids(); updateUI(); closeModal(); triggerHeartEffect(); };
+            confirmBtn.onclick = () => { 
+                if(type==='M1') { 
+                    if(!state.m1.includes(id)) state.m1.push(id); 
+                } else if(type==='M2') { 
+                    if(!state.m2.includes(id)) state.m2.push(id); 
+                } else if(type==='Idol') { 
+                    state.m3Total += amount; 
+                } 
+                save(); 
+                renderGrids(); 
+                updateUI(); 
+                closeModal(); 
+                triggerHeartEffect(); 
+            };
         }
 
         function askConfirmGoal() {
-            const val = parseInt(document.getElementById('goal-input').value); if (!val || val <= 0) return;
-            showModal("目標確認", `確定設定目標金額為 <span class="text-caramel font-bold">$${val.toLocaleString()}</span> 嗎？<br><span class="text-[10px] text-red-500 font-bold">設定後在達成前不可更改哦！</span>`, true, "確定設定", () => { state.goal = val; state.locked = true; save(); updateUI(); closeModal(); });
+            const val = parseInt(document.getElementById('goal-input').value); 
+            if (!val || val <= 0) return;
+            showModal("目標確認", `確定設定目標金額為 <span class="text-caramel font-bold">$${val.toLocaleString()}</span> 嗎？<br><span class="text-[10px] text-red-500 font-bold">設定後在達成前不可更改哦！</span>`, true, "確定設定", () => { 
+                state.goal = val; 
+                state.locked = true; 
+                save(); 
+                updateUI(); 
+                closeModal(); 
+            });
         }
 
         function triggerHeartEffect() {
-            const targetHeart = document.getElementById(`heart-target-${state.activeTab}`); if (!targetHeart) return;
-            const rect = targetHeart.getBoundingClientRect(); const p = document.createElement('div'); p.className = 'heart-particle pulse-active';
+            const targetHeart = document.getElementById(`heart-target-${state.activeTab}`); 
+            if (!targetHeart) return;
+            const rect = targetHeart.getBoundingClientRect(); 
+            const p = document.createElement('div'); 
+            p.className = 'heart-particle pulse-active';
             p.innerHTML = `<svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
             document.body.appendChild(p);
-            setTimeout(() => { p.classList.replace('pulse-active', 'fly-to-target'); p.style.left = (rect.left + rect.width/2) + 'px'; p.style.top = (rect.top + rect.height/2) + 'px'; p.style.transform = 'translate(-50%,-50%) scale(0.1)'; p.style.opacity = '0'; setTimeout(() => p.remove(), 800); }, 700);
+            setTimeout(() => { 
+                p.classList.replace('pulse-active', 'fly-to-target'); 
+                p.style.left = (rect.left + rect.width/2) + 'px'; 
+                p.style.top = (rect.top + rect.height/2) + 'px'; 
+                p.style.transform = 'translate(-50%,-50%) scale(0.1)'; 
+                p.style.opacity = '0'; 
+                setTimeout(() => p.remove(), 800); 
+            }, 700);
         }
 
         function resetData() {
-            const icon = document.getElementById('modal-icon'); icon.classList.remove('text-caramel'); icon.classList.add('text-red-500');
-            showModal("確認清除嗎？(´;ω;`)", `財布君裡累積的點點滴滴<br>真的都要全部清空嗎？<br><span class="text-red-500 font-bold">此動作無法復原喔！</span>`, true, "忍痛清除", () => { localStorage.removeItem(KEY); location.reload(); });
+            const icon = document.getElementById('modal-icon'); 
+            icon.classList.remove('text-caramel'); 
+            icon.classList.add('text-red-500');
+            showModal("確認清除嗎？(´;ω;`)", `財布君裡累積的點點滴滴<br>真的都要全部清空嗎？<br><span class="text-red-500 font-bold">此動作無法復原喔！</span>`, true, "忍痛清除", () => { 
+                localStorage.removeItem(APP_STORAGE_KEY); 
+                localStorage.removeItem(OLD_KEY); 
+                location.reload(); 
+            });
         }
 
         function checkNotificationStatus() {
             const btn = document.getElementById('notification-toggle');
-            if (state.notificationsEnabled && Notification.permission === "granted") { btn.innerText = "提醒已開啟 ✓"; btn.style.background = "var(--caramel)"; btn.style.color = "white"; }
-            else { btn.innerText = "開啟提醒功能"; btn.style.background = "transparent"; btn.style.color = "inherit"; state.notificationsEnabled = false; }
+            if (state.notificationsEnabled && Notification.permission === "granted") { 
+                btn.innerText = "提醒已開啟 ✓"; 
+                btn.style.background = "var(--caramel)"; 
+                btn.style.color = "white"; 
+            } else { 
+                btn.innerText = "開啟提醒功能"; 
+                btn.style.background = "transparent"; 
+                btn.style.color = "inherit"; 
+                state.notificationsEnabled = false; 
+            }
         }
 
         async function toggleNotifications() {
-            if (state.notificationsEnabled) { state.notificationsEnabled = false; save(); checkNotificationStatus(); return; }
+            if (state.notificationsEnabled) { 
+                state.notificationsEnabled = false; 
+                save(); 
+                checkNotificationStatus(); 
+                return; 
+            }
             const permission = await Notification.requestPermission();
-            if (permission === "granted") { state.notificationsEnabled = true; save(); checkNotificationStatus(); showModal("設定成功！", `財布君會準時找您唷！٩(ˊᗜˋ*)و`, false, "太棒了"); }
-            else { showModal("權限被拒絕 (´･_･`)", "請到系統設定中開啟權限。", false, "我知道了"); state.notificationsEnabled = false; save(); checkNotificationStatus(); }
+            if (permission === "granted") { 
+                state.notificationsEnabled = true; 
+                save(); 
+                checkNotificationStatus(); 
+                showModal("設定成功！", `財布君會準時找您唷！٩(ˊᗜˋ*)و`, false, "太棒了"); 
+            } else { 
+                showModal("權限被拒絕 (´･_･`)", "請到系統設定中開啟權限。", false, "我知道了"); 
+                state.notificationsEnabled = false; 
+                save(); 
+                checkNotificationStatus(); 
+            }
         }
 
         function checkReminder() {
             if (!state.notificationsEnabled || Notification.permission !== "granted") return;
-            const now = new Date(); const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            if (currentTime === state.reminderTime) new Notification("存錢時間到囉！- ̗̀( ˶^ᵕ'˶)b", { body: "今天也要乖乖的把錢錢存下來！(و'ω')و" });
+            const now = new Date(); 
+            const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            if (currentTime === state.reminderTime) {
+                new Notification("存錢時間到囉！- ̗̀( ˶^ᵕ'˶)b", { 
+                    body: "今天也要乖乖的把錢錢存下來！(و'ω')و" 
+                });
+            }
         }
 
         function showModal(title, desc, showCancel = true, confirmText = "確認", onConfirm = null) {
-            const modal = document.getElementById('modal'); document.getElementById('modal-title').innerText = title; document.getElementById('modal-desc').innerHTML = desc;
-            const cancelBtn = document.getElementById('modal-cancel-btn'); const confirmBtn = document.getElementById('modal-btn');
+            const modal = document.getElementById('modal'); 
+            document.getElementById('modal-title').innerText = title; 
+            document.getElementById('modal-desc').innerHTML = desc;
+            const cancelBtn = document.getElementById('modal-cancel-btn'); 
+            const confirmBtn = document.getElementById('modal-btn');
             if (showCancel) cancelBtn.classList.remove('hidden'); else cancelBtn.classList.add('hidden');
-            confirmBtn.innerText = confirmText; confirmBtn.onclick = onConfirm || closeModal; modal.classList.add('active');
+            confirmBtn.innerText = confirmText; 
+            confirmBtn.onclick = onConfirm || closeModal; 
+            modal.classList.add('active');
         }
 
         function closeModal() { document.getElementById('modal').classList.remove('active'); }
+        
         window.onload = init;
     </script>
 </body>
 </html>
+

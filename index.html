@@ -270,6 +270,7 @@
             box-shadow: 0 0 15px var(--caramel);
         }
 
+        /* 改版後的每月總結卡片樣式 */
         .summary-card-v2 {
             background: var(--cream);
             border-radius: 28px;
@@ -311,10 +312,52 @@
             outline: none;
             cursor: pointer;
         }
+
+        /* 偶像列表橫向滾動 */
+        .idol-scroll-container {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 4px;
+            scroll-behavior: smooth;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .idol-scroll-container::-webkit-scrollbar { display: none; }
+        
+        .idol-chip {
+            padding: 8px 16px;
+            background: var(--cream);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+            border: 1.5px solid var(--card-border);
+            transition: all 0.3s ease;
+        }
+        .idol-chip.active {
+            background: var(--caramel);
+            color: var(--cream);
+            border-color: var(--caramel);
+        }
+        .add-idol-btn {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            border-radius: 50%;
+            background: var(--cocoa);
+            color: var(--cream);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 10px var(--accent-glow);
+        }
     </style>
 </head>
 <body class="pb-10">
 
+    <!-- 總額頭部 -->
     <header class="p-8 pt-12 flex flex-col items-center">
         <div class="relative flex items-center gap-2">
             <span class="text-[11px] font-bold tracking-[0.2em] opacity-60 uppercase">TOTAL SAVINGS</span>
@@ -335,6 +378,7 @@
         </nav>
     </header>
 
+    <!-- 第一分頁：存錢計畫 -->
     <main id="page-savings" class="px-6 space-y-6">
         <div class="flex justify-center gap-2 mb-2">
             <button onclick="switchTab(1)" id="sub-nav-1" class="sub-nav-btn active">50元零錢</button>
@@ -384,7 +428,20 @@
         </section>
 
         <section id="pane-3" class="tab-pane hidden">
-            <div class="kawaii-card p-8 mb-6">
+            <!-- 偶像選擇器區域 -->
+            <div class="flex items-center gap-3 mb-4">
+                <button onclick="createNewIdol()" class="add-idol-btn btn-hover">+</button>
+                <div id="idol-list-chips" class="idol-scroll-container flex-1">
+                    <!-- JS Render Chips -->
+                </div>
+            </div>
+
+            <div class="kawaii-card p-8 mb-6 relative">
+                <!-- 刪除按鈕 -->
+                <button onclick="deleteCurrentIdol()" class="absolute top-4 right-4 opacity-20 hover:opacity-100 transition-opacity">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                </button>
+
                 <div class="flex justify-between items-center mb-6">
                     <input id="idol-name" type="text" placeholder="輸入偶像名稱" class="flex-1 bg-transparent border-none focus:ring-0 text-xl font-bold placeholder:opacity-30">
                     <div class="heart-filling-container" id="heart-target-3">
@@ -436,6 +493,7 @@
         </section>
     </main>
 
+    <!-- 第二分頁：日常記帳 -->
     <main id="page-ledger" class="px-6 space-y-6 hidden">
         <div class="summary-card-v2 shadow-lg">
             <div class="flex justify-between items-start mb-6">
@@ -509,6 +567,7 @@
         </div>
     </main>
 
+    <!-- 第三分頁：系統設定 -->
     <main id="page-settings" class="px-6 space-y-6 hidden">
         <div class="kawaii-card p-8">
             <h3 class="text-xs font-bold text-caramel uppercase tracking-widest mb-6">主題配色</h3>
@@ -558,6 +617,7 @@
         </div>
     </main>
 
+    <!-- Modal -->
     <div id="modal" class="modal fixed inset-0 flex items-center justify-center p-10">
         <div class="absolute inset-0 bg-black/40" onclick="closeModal()"></div>
         <div class="kawaii-card w-full max-w-xs p-8 relative z-10 text-center mx-auto transform transition-all scale-100">
@@ -574,46 +634,45 @@
     </div>
 
     <script>
-        // 固定 KEY 名稱，以後更新代碼請不要修改這行
-        const APP_STORAGE_KEY = 'WalletKun_Official_Data';
-        const OLD_KEY = 'caramel_heart_v36_ledger_v2';
-
         let state = { 
-            m1: [], m2: [], m3Total: 0, idolName: "", goal: 0, locked: false, 
-            activeTab: 1, reminderTime: "21:00", notificationsEnabled: false,
+            m1: [], m2: [], 
+            // 升級版：支援多個偶像
+            idols: [
+                { id: Date.now(), name: "", total: 0, goal: 0, locked: false }
+            ],
+            activeIdolIndex: 0,
+            reminderTime: "21:00", notificationsEnabled: false,
             mainPage: 'savings',
             ledger: [], 
             ledgerType: 'expense',
             theme: '' 
         };
+        const KEY = 'caramel_heart_v36_ledger_v3_multi_idol';
 
         function init() {
-            // 嘗試讀取新 KEY
-            let data = localStorage.getItem(APP_STORAGE_KEY);
-            
-            // 資料遷移邏輯：如果新 KEY 沒資料，但舊 KEY 有資料，則搬移資料
-            if (!data) {
-                const oldData = localStorage.getItem(OLD_KEY);
-                if (oldData) {
-                    console.log("發現舊版本資料，正在搬移...");
-                    localStorage.setItem(APP_STORAGE_KEY, oldData);
-                    data = oldData;
-                }
-            }
-
+            const data = localStorage.getItem(KEY);
             if (data) {
-                try {
-                    const parsed = JSON.parse(data);
-                    // 確保讀取進來的是對象，並合併預設值
-                    state = Object.assign({}, state, parsed);
-                } catch(e) {
-                    console.error("資料解析失敗", e);
+                const parsed = JSON.parse(data);
+                // 數據兼容性修復：如果用戶是舊版單一偶像數據，轉換為數組格式
+                if (!parsed.idols) {
+                    parsed.idols = [{ 
+                        id: Date.now(), 
+                        name: parsed.idolName || "", 
+                        total: parsed.m3Total || 0, 
+                        goal: parsed.goal || 0, 
+                        locked: parsed.locked || false 
+                    }];
+                    parsed.activeIdolIndex = 0;
                 }
+                state = parsed;
             }
             
-            // 同步 UI 狀態
-            document.getElementById('idol-name').value = state.idolName || "";
-            document.getElementById('idol-name').oninput = (e) => { state.idolName = e.target.value; save(); };
+            // 綁定輸入事件
+            document.getElementById('idol-name').oninput = (e) => { 
+                state.idols[state.activeIdolIndex].name = e.target.value; 
+                save(); 
+                renderIdolChips(); // 即時更新上方列表的名字
+            };
             document.getElementById('reminder-time').value = state.reminderTime || "21:00";
             document.getElementById('reminder-time').onchange = (e) => { state.reminderTime = e.target.value; save(); };
             
@@ -621,6 +680,7 @@
             
             populateMonthSelect();
             renderGrids();
+            renderIdolChips();
             renderLedger();
             renderSummary();
             updateUI();
@@ -630,9 +690,7 @@
             setInterval(checkReminder, 60000);
         }
 
-        function save() { 
-            localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(state)); 
-        }
+        function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
 
         function setTheme(themeName) {
             document.body.classList.remove('theme-pink', 'theme-dark', 'theme-green');
@@ -680,6 +738,52 @@
             document.getElementById(`sub-nav-${idx}`).classList.add('active');
         }
 
+        // --- 偶像應援升級邏輯 ---
+        function createNewIdol() {
+            const newIdol = { id: Date.now(), name: "IDOL", total: 0, goal: 0, locked: false };
+            state.idols.push(newIdol);
+            state.activeIdolIndex = state.idols.length - 1;
+            save();
+            renderIdolChips();
+            updateUI();
+        }
+
+        function selectIdol(index) {
+            state.activeIdolIndex = index;
+            save();
+            renderIdolChips();
+            updateUI();
+        }
+
+        function deleteCurrentIdol() {
+            if (state.idols.length <= 1) {
+                showModal("無法刪除", "至少需要保留一個應援計畫哦！", false, "我知道了");
+                return;
+            }
+            const name = state.idols[state.activeIdolIndex].name || "這個偶像";
+            showModal("刪除應援？", `確定要刪除對 「${name}」 的應援計畫嗎？<br><span class="text-red-500 font-bold">累積的金額將會消失！</span>`, true, "確認刪除", () => {
+                state.idols.splice(state.activeIdolIndex, 1);
+                state.activeIdolIndex = Math.max(0, state.activeIdolIndex - 1);
+                save();
+                renderIdolChips();
+                updateUI();
+                closeModal();
+            });
+        }
+
+        function renderIdolChips() {
+            const container = document.getElementById('idol-list-chips');
+            container.innerHTML = '';
+            state.idols.forEach((idol, idx) => {
+                const chip = document.createElement('button');
+                chip.className = `idol-chip ${idx === state.activeIdolIndex ? 'active' : ''}`;
+                chip.innerText = idol.name || "IDOL";
+                chip.onclick = () => selectIdol(idx);
+                container.appendChild(chip);
+            });
+        }
+        // --- 結束偶像升級邏輯 ---
+
         function setLedgerType(type) {
             state.ledgerType = type;
             document.getElementById('type-exp').classList.toggle('active', type === 'expense');
@@ -687,8 +791,7 @@
         }
 
         function addLedger() {
-            const amtInput = document.getElementById('ledger-amt');
-            const amt = parseInt(amtInput.value);
+            const amt = parseInt(document.getElementById('ledger-amt').value);
             const cat = document.getElementById('ledger-cat').value;
             const note = document.getElementById('ledger-note').value;
             if(!amt || amt <= 0) return;
@@ -709,7 +812,7 @@
             renderSummary();
             updateUI();
             
-            amtInput.value = ''; 
+            document.getElementById('ledger-amt').value = ''; 
             document.getElementById('ledger-note').value = '';
             
             if(entry.type === 'expense') {
@@ -764,7 +867,7 @@
             document.getElementById('ledger-count').innerText = `${filtered.length} TRANSACTIONS`;
             
             if (filtered.length === 0) {
-                list.innerHTML = `<div class="p-10 text-center opacity-30 font-bold text-xs italic">尚無紀錄 (｡•́︿•̀｡)</div>`;
+                list.innerHTML = `<div class="p-10 text-center opacity-30 font-bold text-xs italic">今天還沒記帳哦.ᐟ.ᐟ.ᐟ ( ˙༥˙ )</div>`;
                 return;
             }
 
@@ -814,66 +917,53 @@
         }
 
         function updateUI() {
-            const s1 = (state.m1 || []).length * 50; 
-            const s1Perc = ( (state.m1 || []).length / 365) * 100;
-            updateHeartFill('m1', s1Perc); 
-            document.getElementById('m1-percentage').innerText = Math.round(s1Perc) + '%';
-            document.getElementById('m1-days-count').innerText = `已完成 ${ (state.m1 || []).length}/365天`;
+            // M1 & M2 UI
+            const s1 = state.m1.length * 50; const s1Perc = (state.m1.length / 365) * 100;
+            updateHeartFill('m1', s1Perc); document.getElementById('m1-percentage').innerText = Math.round(s1Perc) + '%';
+            document.getElementById('m1-days-count').innerText = `已完成 ${state.m1.length}/365天`;
             
-            const s2 = (state.m2 || []).reduce((a,b)=>a+b, 0); 
-            const s2Total = (1 + 365) * 365 / 2;
-            updateHeartFill('m2', (s2 / s2Total) * 100); 
-            document.getElementById('m2-total').innerText = s2.toLocaleString();
+            const s2 = state.m2.reduce((a,b)=>a+b, 0); const s2Total = (1 + 365) * 365 / 2;
+            updateHeartFill('m2', (s2 / s2Total) * 100); document.getElementById('m2-total').innerText = s2.toLocaleString();
             
-            const s3 = state.m3Total || 0; 
-            document.getElementById('m3-total-display').innerText = s3.toLocaleString();
-            if (state.locked && state.goal > 0) {
-                updateHeartFill('m3', Math.min(100, (s3 / state.goal) * 100));
+            // M3 (偶像應援) UI
+            const currentIdol = state.idols[state.activeIdolIndex];
+            document.getElementById('idol-name').value = currentIdol.name;
+            document.getElementById('m3-total-display').innerText = currentIdol.total.toLocaleString();
+            
+            if (currentIdol.locked && currentIdol.goal > 0) {
+                updateHeartFill('m3', Math.min(100, (currentIdol.total / currentIdol.goal) * 100));
                 document.getElementById('goal-ui-setup').classList.add('hidden'); 
                 document.getElementById('goal-ui-locked').classList.remove('hidden');
-                const diff = state.goal - s3; 
+                const diff = currentIdol.goal - currentIdol.total; 
                 document.getElementById('goal-diff-text').innerText = diff <= 0 ? `已達成目標！` : `還差 $${diff.toLocaleString()} 達成目標`;
             } else { 
                 updateHeartFill('m3', 0); 
                 document.getElementById('goal-ui-setup').classList.remove('hidden'); 
                 document.getElementById('goal-ui-locked').classList.add('hidden'); 
+                document.getElementById('goal-input').value = "";
             }
             
-            const ledgerBalance = (state.ledger || []).reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, 0);
-            document.getElementById('header-total').innerText = (s1 + s2 + s3 + ledgerBalance).toLocaleString();
+            // 總額計算（包含所有偶像的儲蓄）
+            const allIdolsTotal = state.idols.reduce((acc, curr) => acc + curr.total, 0);
+            const ledgerBalance = state.ledger.reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, 0);
+            document.getElementById('header-total').innerText = (s1 + s2 + allIdolsTotal + ledgerBalance).toLocaleString();
         }
 
-        function updateHeartFill(id, percentage) { 
-            const rect = document.getElementById(`${id}-fill-rect`); 
-            if (rect) { 
-                const height = (percentage / 100) * 24; 
-                rect.setAttribute('y', 24 - height); 
-                rect.setAttribute('height', height); 
-            } 
-        }
+        function updateHeartFill(id, percentage) { const rect = document.getElementById(`${id}-fill-rect`); if (rect) { const height = (percentage / 100) * 24; rect.setAttribute('y', 24 - height); rect.setAttribute('height', height); } }
         
         function askConfirm(type, amount, id) {
-            const modal = document.getElementById('modal'); 
-            const desc = document.getElementById('modal-desc'); 
-            const title = document.getElementById('modal-title');
-            const confirmBtn = document.getElementById('modal-btn'); 
-            const cancelBtn = document.getElementById('modal-cancel-btn'); 
-            const icon = document.getElementById('modal-icon');
+            const modal = document.getElementById('modal'); const desc = document.getElementById('modal-desc'); const title = document.getElementById('modal-title');
+            const confirmBtn = document.getElementById('modal-btn'); const cancelBtn = document.getElementById('modal-cancel-btn'); const icon = document.getElementById('modal-icon');
+            icon.classList.remove('text-red-500'); icon.classList.add('text-caramel'); cancelBtn.classList.remove('hidden'); cancelBtn.innerText = "取消"; confirmBtn.innerText = "確認餵食"; title.innerText = "確認餵食";
             
-            icon.classList.remove('text-red-500'); 
-            icon.classList.add('text-caramel'); 
-            cancelBtn.classList.remove('hidden'); 
-            cancelBtn.innerText = "取消"; 
-            confirmBtn.innerText = "確認餵食"; 
-            title.innerText = "確認餵食";
-
             if (type === 'M1' || type === 'M2') { 
                 desc.innerHTML = `要餵食 $${amount} 元給財布君嗎？<br>確認後財布君就會把它吃進去哦！<br>(๑⃙⃘´༥\`๑⃙⃘)`; 
-            } else if (type === 'Idol') { 
+            }
+            else if (type === 'Idol') { 
+                const idolName = state.idols[state.activeIdolIndex].name || "偶像";
                 title.innerText = "注入應援基金"; 
-                desc.innerHTML = `財布君將幫您保管 <span class="text-caramel font-bold">$${amount}</span> 應援基金 <br> ٩(ˊᗜˋ*)و`; 
-                cancelBtn.classList.add('hidden'); 
-                confirmBtn.innerText = "請幫我保管！"; 
+                desc.innerHTML = `財布君將幫您為 <span class="text-caramel font-bold">${idolName}</span> 保管 <span class="text-caramel font-bold">$${amount}</span> <br> ٩(ˊᗜˋ*)و`; 
+                cancelBtn.classList.add('hidden'); confirmBtn.innerText = "請幫我保管！"; 
             }
             
             modal.classList.add('active');
@@ -883,119 +973,62 @@
                 } else if(type==='M2') { 
                     if(!state.m2.includes(id)) state.m2.push(id); 
                 } else if(type==='Idol') { 
-                    state.m3Total += amount; 
+                    state.idols[state.activeIdolIndex].total += amount; 
                 } 
-                save(); 
-                renderGrids(); 
-                updateUI(); 
-                closeModal(); 
-                triggerHeartEffect(); 
+                save(); renderGrids(); updateUI(); closeModal(); triggerHeartEffect(); 
             };
         }
 
         function askConfirmGoal() {
-            const val = parseInt(document.getElementById('goal-input').value); 
-            if (!val || val <= 0) return;
+            const val = parseInt(document.getElementById('goal-input').value); if (!val || val <= 0) return;
             showModal("目標確認", `確定設定目標金額為 <span class="text-caramel font-bold">$${val.toLocaleString()}</span> 嗎？<br><span class="text-[10px] text-red-500 font-bold">設定後在達成前不可更改哦！</span>`, true, "確定設定", () => { 
-                state.goal = val; 
-                state.locked = true; 
-                save(); 
-                updateUI(); 
-                closeModal(); 
+                state.idols[state.activeIdolIndex].goal = val; 
+                state.idols[state.activeIdolIndex].locked = true; 
+                save(); updateUI(); closeModal(); 
             });
         }
 
         function triggerHeartEffect() {
-            const targetHeart = document.getElementById(`heart-target-${state.activeTab}`); 
-            if (!targetHeart) return;
-            const rect = targetHeart.getBoundingClientRect(); 
-            const p = document.createElement('div'); 
-            p.className = 'heart-particle pulse-active';
+            const targetHeart = document.getElementById(`heart-target-${state.activeTab}`); if (!targetHeart) return;
+            const rect = targetHeart.getBoundingClientRect(); const p = document.createElement('div'); p.className = 'heart-particle pulse-active';
             p.innerHTML = `<svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
             document.body.appendChild(p);
-            setTimeout(() => { 
-                p.classList.replace('pulse-active', 'fly-to-target'); 
-                p.style.left = (rect.left + rect.width/2) + 'px'; 
-                p.style.top = (rect.top + rect.height/2) + 'px'; 
-                p.style.transform = 'translate(-50%,-50%) scale(0.1)'; 
-                p.style.opacity = '0'; 
-                setTimeout(() => p.remove(), 800); 
-            }, 700);
+            setTimeout(() => { p.classList.replace('pulse-active', 'fly-to-target'); p.style.left = (rect.left + rect.width/2) + 'px'; p.style.top = (rect.top + rect.height/2) + 'px'; p.style.transform = 'translate(-50%,-50%) scale(0.1)'; p.style.opacity = '0'; setTimeout(() => p.remove(), 800); }, 700);
         }
 
         function resetData() {
-            const icon = document.getElementById('modal-icon'); 
-            icon.classList.remove('text-caramel'); 
-            icon.classList.add('text-red-500');
-            showModal("確認清除嗎？(´;ω;`)", `財布君裡累積的點點滴滴<br>真的都要全部清空嗎？<br><span class="text-red-500 font-bold">此動作無法復原喔！</span>`, true, "忍痛清除", () => { 
-                localStorage.removeItem(APP_STORAGE_KEY); 
-                localStorage.removeItem(OLD_KEY); 
-                location.reload(); 
-            });
+            const icon = document.getElementById('modal-icon'); icon.classList.remove('text-caramel'); icon.classList.add('text-red-500');
+            showModal("確認清除嗎？(´;ω;`)", `財布君裡累積的點點滴滴<br>真的都要全部清空嗎？<br><span class="text-red-500 font-bold">此動作無法復原喔！</span>`, true, "忍痛清除", () => { localStorage.removeItem(KEY); location.reload(); });
         }
 
         function checkNotificationStatus() {
             const btn = document.getElementById('notification-toggle');
-            if (state.notificationsEnabled && Notification.permission === "granted") { 
-                btn.innerText = "提醒已開啟 ✓"; 
-                btn.style.background = "var(--caramel)"; 
-                btn.style.color = "white"; 
-            } else { 
-                btn.innerText = "開啟提醒功能"; 
-                btn.style.background = "transparent"; 
-                btn.style.color = "inherit"; 
-                state.notificationsEnabled = false; 
-            }
+            if (state.notificationsEnabled && Notification.permission === "granted") { btn.innerText = "提醒已開啟 ✓"; btn.style.background = "var(--caramel)"; btn.style.color = "white"; }
+            else { btn.innerText = "開啟提醒功能"; btn.style.background = "transparent"; btn.style.color = "inherit"; state.notificationsEnabled = false; }
         }
 
         async function toggleNotifications() {
-            if (state.notificationsEnabled) { 
-                state.notificationsEnabled = false; 
-                save(); 
-                checkNotificationStatus(); 
-                return; 
-            }
+            if (state.notificationsEnabled) { state.notificationsEnabled = false; save(); checkNotificationStatus(); return; }
             const permission = await Notification.requestPermission();
-            if (permission === "granted") { 
-                state.notificationsEnabled = true; 
-                save(); 
-                checkNotificationStatus(); 
-                showModal("設定成功！", `財布君會準時找您唷！٩(ˊᗜˋ*)و`, false, "太棒了"); 
-            } else { 
-                showModal("權限被拒絕 (´･_･`)", "請到系統設定中開啟權限。", false, "我知道了"); 
-                state.notificationsEnabled = false; 
-                save(); 
-                checkNotificationStatus(); 
-            }
+            if (permission === "granted") { state.notificationsEnabled = true; save(); checkNotificationStatus(); showModal("設定成功！", `財布君會準時找您唷！٩(ˊᗜˋ*)و`, false, "太棒了"); }
+            else { showModal("權限被拒絕 (´･_･`)", "請到系統設定中開啟權限。", false, "我知道了"); state.notificationsEnabled = false; save(); checkNotificationStatus(); }
         }
 
         function checkReminder() {
             if (!state.notificationsEnabled || Notification.permission !== "granted") return;
-            const now = new Date(); 
-            const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            if (currentTime === state.reminderTime) {
-                new Notification("存錢時間到囉！- ̗̀( ˶^ᵕ'˶)b", { 
-                    body: "今天也要乖乖的把錢錢存下來！(و'ω')و" 
-                });
-            }
+            const now = new Date(); const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            if (currentTime === state.reminderTime) new Notification("存錢時間到囉！- ̗̀( ˶^ᵕ'˶)b", { body: "今天也要乖乖的把錢錢存下來！(و'ω')و" });
         }
 
         function showModal(title, desc, showCancel = true, confirmText = "確認", onConfirm = null) {
-            const modal = document.getElementById('modal'); 
-            document.getElementById('modal-title').innerText = title; 
-            document.getElementById('modal-desc').innerHTML = desc;
-            const cancelBtn = document.getElementById('modal-cancel-btn'); 
-            const confirmBtn = document.getElementById('modal-btn');
+            const modal = document.getElementById('modal'); document.getElementById('modal-title').innerText = title; document.getElementById('modal-desc').innerHTML = desc;
+            const cancelBtn = document.getElementById('modal-cancel-btn'); const confirmBtn = document.getElementById('modal-btn');
             if (showCancel) cancelBtn.classList.remove('hidden'); else cancelBtn.classList.add('hidden');
-            confirmBtn.innerText = confirmText; 
-            confirmBtn.onclick = onConfirm || closeModal; 
-            modal.classList.add('active');
+            confirmBtn.innerText = confirmText; confirmBtn.onclick = onConfirm || closeModal; modal.classList.add('active');
         }
 
         function closeModal() { document.getElementById('modal').classList.remove('active'); }
-        
         window.onload = init;
     </script>
 </body>
 </html>
-

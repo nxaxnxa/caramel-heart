@@ -636,7 +636,6 @@
     <script>
         let state = { 
             m1: [], m2: [], 
-            // 升級版：支援多個偶像
             idols: [
                 { id: Date.now(), name: "", total: 0, goal: 0, locked: false }
             ],
@@ -647,31 +646,54 @@
             ledgerType: 'expense',
             theme: '' 
         };
-        const KEY = 'caramel_heart_v36_ledger_v3_multi_idol';
+
+        // 核心設定：版本 Key 名稱
+        const OLD_KEY = 'caramel_heart_v36'; 
+        const NEW_KEY = 'caramel_heart_v36_ledger_v3_multi_idol';
 
         function init() {
-            const data = localStorage.getItem(KEY);
-            if (data) {
-                const parsed = JSON.parse(data);
-                // 數據兼容性修復：如果用戶是舊版單一偶像數據，轉換為數組格式
-                if (!parsed.idols) {
-                    parsed.idols = [{ 
+            const newData = localStorage.getItem(NEW_KEY);
+            const oldData = localStorage.getItem(OLD_KEY);
+
+            if (newData) {
+                // 如果已經有新版資料，直接載入
+                state = JSON.parse(newData);
+            } else if (oldData) {
+                // 【自動搬家邏輯】偵測到舊版資料，進行升級搬運
+                const parsedOld = JSON.parse(oldData);
+                
+                state.m1 = parsedOld.m1 || [];
+                state.m2 = parsedOld.m2 || [];
+                state.ledger = parsedOld.ledger || [];
+                state.theme = parsedOld.theme || '';
+                state.reminderTime = parsedOld.reminderTime || "21:00";
+                state.notificationsEnabled = parsedOld.notificationsEnabled || false;
+                
+                // 將舊版「單一偶像」格式轉換為新版「陣列」格式
+                if (parsedOld.idols) {
+                    state.idols = parsedOld.idols;
+                    state.activeIdolIndex = parsedOld.activeIdolIndex || 0;
+                } else {
+                    state.idols = [{ 
                         id: Date.now(), 
-                        name: parsed.idolName || "", 
-                        total: parsed.m3Total || 0, 
-                        goal: parsed.goal || 0, 
-                        locked: parsed.locked || false 
+                        name: parsedOld.idolName || "", 
+                        total: parsedOld.m3Total || 0, 
+                        goal: parsedOld.goal || 0, 
+                        locked: parsedOld.locked || false 
                     }];
-                    parsed.activeIdolIndex = 0;
+                    state.activeIdolIndex = 0;
                 }
-                state = parsed;
+                
+                // 搬家後立刻存入新版 Key
+                save();
+                console.log("資料成功從 v36 搬遷至新版！");
             }
             
-            // 綁定輸入事件
+            // 綁定 UI 事件
             document.getElementById('idol-name').oninput = (e) => { 
                 state.idols[state.activeIdolIndex].name = e.target.value; 
                 save(); 
-                renderIdolChips(); // 即時更新上方列表的名字
+                renderIdolChips(); 
             };
             document.getElementById('reminder-time').value = state.reminderTime || "21:00";
             document.getElementById('reminder-time').onchange = (e) => { state.reminderTime = e.target.value; save(); };
@@ -690,7 +712,10 @@
             setInterval(checkReminder, 60000);
         }
 
-        function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+        function save() { 
+            // 每次保存都會寫入最新的 NEW_KEY
+            localStorage.setItem(NEW_KEY, JSON.stringify(state)); 
+        }
 
         function setTheme(themeName) {
             document.body.classList.remove('theme-pink', 'theme-dark', 'theme-green');
@@ -738,7 +763,6 @@
             document.getElementById(`sub-nav-${idx}`).classList.add('active');
         }
 
-        // --- 偶像應援升級邏輯 ---
         function createNewIdol() {
             const newIdol = { id: Date.now(), name: "IDOL", total: 0, goal: 0, locked: false };
             state.idols.push(newIdol);
@@ -782,7 +806,6 @@
                 container.appendChild(chip);
             });
         }
-        // --- 結束偶像升級邏輯 ---
 
         function setLedgerType(type) {
             state.ledgerType = type;
@@ -917,7 +940,6 @@
         }
 
         function updateUI() {
-            // M1 & M2 UI
             const s1 = state.m1.length * 50; const s1Perc = (state.m1.length / 365) * 100;
             updateHeartFill('m1', s1Perc); document.getElementById('m1-percentage').innerText = Math.round(s1Perc) + '%';
             document.getElementById('m1-days-count').innerText = `已完成 ${state.m1.length}/365天`;
@@ -925,7 +947,6 @@
             const s2 = state.m2.reduce((a,b)=>a+b, 0); const s2Total = (1 + 365) * 365 / 2;
             updateHeartFill('m2', (s2 / s2Total) * 100); document.getElementById('m2-total').innerText = s2.toLocaleString();
             
-            // M3 (偶像應援) UI
             const currentIdol = state.idols[state.activeIdolIndex];
             document.getElementById('idol-name').value = currentIdol.name;
             document.getElementById('m3-total-display').innerText = currentIdol.total.toLocaleString();
@@ -943,7 +964,6 @@
                 document.getElementById('goal-input').value = "";
             }
             
-            // 總額計算（包含所有偶像的儲蓄）
             const allIdolsTotal = state.idols.reduce((acc, curr) => acc + curr.total, 0);
             const ledgerBalance = state.ledger.reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, 0);
             document.getElementById('header-total').innerText = (s1 + s2 + allIdolsTotal + ledgerBalance).toLocaleString();
@@ -998,7 +1018,7 @@
 
         function resetData() {
             const icon = document.getElementById('modal-icon'); icon.classList.remove('text-caramel'); icon.classList.add('text-red-500');
-            showModal("確認清除嗎？(´;ω;`)", `財布君裡累積的點點滴滴<br>真的都要全部清空嗎？<br><span class="text-red-500 font-bold">此動作無法復原喔！</span>`, true, "忍痛清除", () => { localStorage.removeItem(KEY); location.reload(); });
+            showModal("確認清除嗎？(´;ω;`)", `財布君裡累積的點點滴滴<br>真的都要全部清空嗎？<br><span class="text-red-500 font-bold">此動作無法復原喔！</span>`, true, "忍痛清除", () => { localStorage.removeItem(NEW_KEY); location.reload(); });
         }
 
         function checkNotificationStatus() {
@@ -1032,3 +1052,4 @@
     </script>
 </body>
 </html>
+
